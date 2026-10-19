@@ -46,7 +46,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node test/smoke.mjs && node test/host-route.mjs",`n    "test:github": "node test/github-install.mjs",`n    "test:live": "node test/github-live.mjs"
+    "test": "node test/smoke.mjs && node test/host-route.mjs",
+    "test:github": "node test/github-install.mjs",
+    "test:live": "node test/github-live.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-tools": "^0.2.0-rc.2"
