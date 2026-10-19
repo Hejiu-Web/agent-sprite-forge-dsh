@@ -1,0 +1,25 @@
+From a1abb74736fe327af2fc311d5ef828272f229e14 Mon Sep 17 00:00:00 2001
+From: dsh-agent <dsh-agent@local.invalid>
+Date: Mon, 19 Oct 2026 15:23:10 +0800
+Subject: [PATCH 5/5] docs(readme): list the opt-in host route in the route
+ table
+
+---
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/README.md b/README.md
+index b5e8275..4e1f974 100644
+--- a/README.md
++++ b/README.md
+@@ -202,6 +202,7 @@ Every generated image or clip goes through `generate2dmedia/scripts/route_media.
+ | 1 | **API**: a key you configured | OpenAI, Google Gemini, xAI, BytePlus Seedream, fal.ai (reference edits) | xAI, BytePlus Seedance, fal.ai (Kling v3, Veo 3.1, Luma, MiniMax, Wan, Vidu, LTX) | A key is configured. The key is your consent, so there is no per-call question |
+ | 2 | **Local CLI**: your own signed-in Codex or Grok | Codex `image_gen` (up to 8 references); Grok one-shot image or edit | Grok image-to-video in ACP mode (6 or 10 s) | No key, or every API route refused for an account reason (no key, auth, quota, rate limit). Uses your subscription quota, never an API key |
+ | 3 | **Code art** (`codeart2d`) | Code-drawn pixel sprites, vector art, FX, tiles | Rigged animation | The last resort: only when no route exists (`no-route`, exit 3) or when you ask for code-drawn art. Always disclosed as code-drawn |
++| — | **Host** (`host:dsh`, opt-in) | The host agent's own image tool | none yet | DeepSeek Harness: the DSH plugin exports a bridge and the project has `http/route_media.py`; the host route then leads the order. See [DeepSeek Harness](#quickstart) |
+ 
+ `python "<generate2dmedia>/scripts/route_media.py" resolve --kind image` prints the route that would run, and `forge_doctor.py` lists which keys are configured (yes or no, never the key) and the resolved order. A moderation refusal, or an outcome that may have cost money, is never retried on another route.
+ 
+-- 
+2.53.0.windows.2
+

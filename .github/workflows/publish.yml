@@ -1,0 +1,39 @@
+name: Publish to npm
+
+# Publishes dsh-agent-sprite-forge with a provenance attestation, so the npm
+# page links the package to this repository and this commit.
+#
+# One-time setup on npmjs.com: package settings → Publishing access → Trusted
+# publisher → GitHub Actions, repository Hejiu-Web/agent-sprite-forge-dsh,
+# workflow filename publish.yml. No NPM_TOKEN secret is needed.
+#
+# Trigger: push a tag like `v1.0.0`, or run manually from Actions.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Check the manifest
+        run: |
+          node -e "const p=require('./package.json'); if(!p.repository||!p.repository.url) throw new Error('repository is required for provenance'); console.log('publishing', p.name+'@'+p.version)"
+
+      - name: Publish with provenance
+        run: npm publish --provenance --access public

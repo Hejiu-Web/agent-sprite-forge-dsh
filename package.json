@@ -1,0 +1,63 @@
+{
+  "name": "dsh-agent-sprite-forge",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness adapter for Agent Sprite Forge (0x0funky/agent-sprite-forge): registers its five agent skills with DSH, runs their Python processors with DSH's own Python, and connects the Forge route layer to DSH's image tool.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/http/",
+    "cordis.patch.yml",
+    "tools/",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Hejiu-Web"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hejiu-Web/agent-sprite-forge-dsh.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hejiu-Web/agent-sprite-forge-dsh/issues"
+  },
+  "homepage": "https://github.com/Hejiu-Web/agent-sprite-forge-dsh#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-sprite-forge",
+    "game-dev",
+    "sprites",
+    "skills"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs && node test/host-route.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

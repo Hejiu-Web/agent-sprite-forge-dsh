@@ -1,0 +1,152 @@
+﻿diff --git a/skills/generate2dmedia/scripts/forge_doctor.py b/skills/generate2dmedia/scripts/forge_doctor.py
+index d456f38..1d15936 100644
+--- a/skills/generate2dmedia/scripts/forge_doctor.py
++++ b/skills/generate2dmedia/scripts/forge_doctor.py
+@@ -136,7 +136,8 @@ SKIP_FILES = frozenset({"Thumbs.db", "desktop.ini"})
+ SKIP_SUFFIXES = frozenset({".pyc", ".pyo"})
+ # User-facing route names (D22): one "Grok (local CLI)" route, one-shot mode for images and ACP mode for
+ # video; the internal ids stay codex-cli, grok-cli and grok-acp.
+-ROUTE_LABEL = {"codex-cli": "Codex (local CLI)", "grok-cli": "Grok (local CLI, one-shot image mode)",
++ROUTE_LABEL = {"dsh": "DeepSeek Harness image tool (host)",  # _HOST_LABEL_READY
++"codex-cli": "Codex (local CLI)", "grok-cli": "Grok (local CLI, one-shot image mode)",
+                "grok-acp": "Grok (local CLI, ACP video mode)"}
+ API_LABEL = {"openai": "OpenAI API", "gemini": "Google Gemini API", "xai": "xAI API", "byteplus": "BytePlus ModelArk API",
+              "fal": "fal.ai API"}
+diff --git a/skills/generate2dmedia/scripts/route_media.py b/skills/generate2dmedia/scripts/route_media.py
+index 31308fe..86d47d0 100644
+--- a/skills/generate2dmedia/scripts/route_media.py
++++ b/skills/generate2dmedia/scripts/route_media.py
+@@ -130,6 +130,8 @@ class Candidate:
+     def label(self) -> str:
+         if self.family == "api":
+             return f"{media_providers.adapter(self.target).label} ({self.model})"
++        if self.family == "host":
++            return self.notes[0] if self.notes else "host media tool"
+         return forge_doctor.ROUTE_LABEL[self.target]
+ 
+ 
+@@ -318,6 +320,38 @@ def unsupported_local(kind: str, candidate: Candidate, wanted: Wanted) -> str |
+     return None
+ 
+ 
++
++# ASF host route (dsh-plugin-asf-suite) -----------------------------------------------------------------
++def _host_route_media():
++    """The workspace's http/route_media.py (the DSH bridge shim), or None."""
++    import importlib.util
++    import os
++    if not (os.environ.get("ASF_DSH_BRIDGE") and os.environ.get("ASF_DSH_TOKEN")):
++        return None  # no host bridge in this process: nothing to route to
++    project = os.environ.get("ASF_DSH_WORKSPACE") or os.environ.get("FORGE_PROJECT_DIR") or os.getcwd()
++    candidates = [Path(project) / "http" / "route_media.py", Path.cwd() / "http" / "route_media.py"]
++    seen = set()
++    for path in candidates:
++        if str(path) in seen or not path.is_file():
++            continue
++        seen.add(str(path))
++        try:
++            spec = importlib.util.spec_from_file_location(f"asf_workspace_route_media_{len(seen)}", path)
++            module = importlib.util.module_from_spec(spec)
++            spec.loader.exec_module(module)
++        except Exception:  # noqa: BLE001  a broken shim must never break route_media
++            continue
++        ready = getattr(module, "bridge_ready", None)
++        if callable(ready) and ready():
++            return module
++    return None
++
++
++def _host_candidate(module):
++    return Candidate(module.ROUTE_NAME)
++# ASF host route (dsh-plugin-asf-suite) ------------------------------------------------------------- end
++
++
+ def resolve(kind: str, route: str = "auto", *, references: int | None = None, resolution: str = "720p",
+             last_frame: bool = False, settings: dict | None = None, wanted: Wanted | None = None) -> Resolution:
+     """The candidates for one request, in order, and why the others were skipped. Spawns nothing:
+@@ -332,6 +366,9 @@ def resolve(kind: str, route: str = "auto", *, references: int | None = None, re
+                         last_frame=DUMMY_IMAGE if last_frame else None)
+     preferred, problems = media_config.provider_order(kind, settings)
+     order = requested_routes(kind, route, preferred)
++    _host = _host_route_media() if kind == "image" else None
++    if _host is not None and route in ("auto", "local", "host", "dsh"):
++        order = [_host.ROUTE_NAME, *[name for name in order if name != _host.ROUTE_NAME]]
+     candidates, skipped, clis = [], [], {}
+     if problem and any(name.startswith("api:") for name in order):
+         skipped.append(f"user config file ignored: {problem}")
+@@ -339,6 +376,12 @@ def resolve(kind: str, route: str = "auto", *, references: int | None = None, re
+     fal_model = FAL_ROUTE.fullmatch(route)
+     for name in order:
+         family, target = name.split(":", 1)
++        if family == "host":
++            if _host is not None and not wanted.model:
++                _h = Candidate(_host.ROUTE_NAME)
++                _h.notes.append(str(_host.describe().get("label", "host media tool")))
++                candidates.append(_h)
++            continue
+         if family == "api":
+             if not media_config.api_key(target, settings):
+                 skipped.append(f"{name}: no {media_config.PROVIDERS[target]} in the environment or the user config file")
+@@ -542,6 +585,8 @@ def run_local(candidate: Candidate, args: argparse.Namespace) -> dict:
+ 
+ def model_of(candidate: Candidate, args: argparse.Namespace) -> str:
+     """The requested model: the API model, or <cli>-<tool> for a local route (as job.json records it)."""
++    if candidate.family == "host":
++        return "host media tool"
+     if candidate.family == "api":
+         return candidate.model
+     tool = "image_to_video" if args.command == "video" else (
+@@ -580,6 +625,21 @@ def set_aside(out_dir: Path, candidate: Candidate) -> str | None:
+     raise RouteError(f"{candidate.route} was refused and too many earlier attempt folders exist beside the output")
+ 
+ 
++def run_host(candidate: Candidate, args: argparse.Namespace) -> dict:
++    """The host route: the workspace shim turns the request into the host's own call."""
++    module = _host_route_media()
++    if module is None:
++        raise cli_media.CliMediaError("TOOL_UNAVAILABLE", "no host bridge in this environment")
++    if not hasattr(module, "run"):
++        raise cli_media.CliMediaError("TOOL_UNAVAILABLE", "the workspace http/route_media.py has no run()")
++    try:
++        result = module.run(candidate.target, args)
++    except Exception as exc:  # noqa: BLE001  the host's failure is not the request's
++        raise cli_media.CliMediaError("GENERATION_FAILED", f"host: {type(exc).__name__}: {exc}") from None
++    return {"artifact": result["artifact"], "sha256": result["sha256"], "estimateUsd": 0.0,
++            "job": result.get("bridgeArtifact"), "notes": []}
++
++
+ def generate(args: argparse.Namespace, resolution: Resolution, transport=None) -> dict:
+     """Run the candidates in order until one succeeds or one fails for a reason about the request."""
+     attempts = []
+@@ -587,7 +647,12 @@ def generate(args: argparse.Namespace, resolution: Resolution, transport=None) -
+     for index, candidate in enumerate(resolution.candidates):
+         last = index == len(resolution.candidates) - 1
+         try:
+-            outcome = run_api(candidate, args, transport) if candidate.family == "api" else run_local(candidate, args)
++            if candidate.family == "host":
++                outcome = run_host(candidate, args)
++            elif candidate.family == "api":
++                outcome = run_api(candidate, args, transport)
++            else:
++                outcome = run_local(candidate, args)
+         except generate_media.MediaError as exc:
+             code, message = exc.code, str(exc)
+             passes = code in API_NEXT and refused_cleanly(out_dir)
+@@ -715,6 +780,8 @@ def delegate(fake: str, argv: list) -> int:
+ 
+ 
+ def _known_model(kind: str, args: argparse.Namespace) -> None:
++    if getattr(args, "route", None) in ("host", "dsh"):  # _HOST_KNOWN_MODEL_READY
++        return
+     """An explicitly named model must be one the route can send: a model is a usage error, never a reason
+     to answer no-route (which sends the caller to code-drawn art)."""
+     match = FAL_ROUTE.fullmatch(args.route)
+@@ -752,6 +819,8 @@ def main(argv: list | None = None, transport=None) -> int:
+     parser = build_parser()
+     args = parser.parse_args(raw)
+     kind = args.kind if args.command == "resolve" else args.command
++    if args.route in ("host", "dsh"):  # the host route is not in ROUTE_CHOICES
++        args.route = "auto"
+     if args.route not in ROUTE_CHOICES[kind] and not (FAL_ROUTE.fullmatch(args.route) and "api:fal" in ORDER[kind]):
+         parser.error(f"--route {args.route} is not a {kind} route (choose from {', '.join(ROUTE_CHOICES[kind])} "
+                      "or fal:<endpoint-id>)")

@@ -1,0 +1,31 @@
+# Bundle patch for dsh-agent-sprite-forge.
+#
+# The DeepSeek Harness host for the Agent Sprite Forge skills. Nothing official
+# is replaced: this plugin registers the five Forge skills on `ctx.skills`,
+# serves their scripts through the `asf_run` tool, and connects the Forge route
+# layer to DSH's own image tool through a token-guarded loopback bridge.
+#
+# `forgeRoot` points at the agent-sprite-forge checkout (the repository holding
+# `skills/`). Leave it empty when one of `workspaceCandidates` finds it.
+- insert:
+    - id: asf-suite
+      name: dsh-agent-sprite-forge
+      config:
+        forgeRoot: ""
+        workspaceCandidates:
+          - agent-sprite-forge
+          - vendor/agent-sprite-forge
+          - ../agent-sprite-forge
+        python:
+          path: ""
+          env: {}
+        extraPaths: []
+        skillPrefix: ""
+        registerSkills: true
+        mediaTools: [image_generate, image_gen]
+        httpBridge: true
+        httpBridgePort: 0
+        workspaceFallback: true
+        defaultTimeoutMs: 600000
+        maxTimeoutMs: 3600000
+        maxOutputBytes: 262144
