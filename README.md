@@ -31,11 +31,20 @@ tool, so the skills work in DSH without any API key.
 3. Restart DSH (or reload the plugin) and start a session in the project. The
    five skills appear in the session skill catalog.
 
+> Installing from this repository does **not** ship the skills. The plugin
+> serves `skills/` from the checkout you pass to `setup.py` (or from
+> `forgeRoot` / `workspaceCandidates` in the plugin config).
+
 `--dry-run` prints the plan without writing. Undo:
 
 ```powershell
 python <plugin>/tools/patch_route_media.py --forge-root <checkout> --revert
 ```
+
+Verified against the GitHub URL itself: `test/github-live.mjs` downloads
+`codeload.github.com/Hejiu-Web/agent-sprite-forge-dsh/tar.gz/refs/heads/main`,
+installs it the way npm does, resolves `dsh.bundle.patch` → package → entry, and
+mounts it to register the five skills.
 
 ## How it works
 
